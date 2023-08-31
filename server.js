@@ -1,5 +1,5 @@
 const inquirer = require('inquirer');
-const mysql = require('mysql2')
+const mysql = require('mysql2/promise')
 require('dotenv').config();
 
 
@@ -17,13 +17,25 @@ require('dotenv').config();
 function getConnection() {
     return mysql.createConnection(
         {
-          host: 'localhost',
-          port: 3306,
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database:  process.env.DB_NAME,
-        },
+        host: 'localhost',
+        port: 3306,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database:  process.env.DB_NAME,
+        }
     );
+    // return new Promise(async (resolve, reject) => {
+    //     const connection = await mysql.createConnection(
+    //         {
+    //         host: 'localhost',
+    //         port: 3306,
+    //         user: process.env.DB_USER,
+    //         password: process.env.DB_PASSWORD,
+    //         database:  process.env.DB_NAME,
+    //         }
+    //     );
+    //     resolve(connection);
+    // })
 }
 
 function closeConnection(db){
@@ -60,8 +72,7 @@ const promptUser = () => {
                 'Delete a department',
                 'Delete a role',
                 'Delete an employee',
-                'View department budgets',
-                'No Action']
+                'View department budgets']
         }
     ])
         .then((answers) => {
@@ -121,34 +132,28 @@ const promptUser = () => {
         });
 };
 
-viewAllDepartments = () => {
-    const db = getConnection() 
-    db.query(`SELECT * from department`, (err, result) => {
-        if (err) {
-          console.log(err);
-        }
-        console.table(result);
-      });
-      rePrompt(db)
+const departmentQuery = `SELECT * from department`
+
+viewAllDepartments = async () => {
+    const db = await getConnection();
+    const departments = await db.query(departmentQuery);
+    console.table(departments[0]);
+    rePrompt(db)
 }
-viewAllRoles = () => {
-    const db = getConnection()
-    db.query(`
+viewAllRoles = async () => {
+    const db = await getConnection();
+    const rows = await db.query(`
     SELECT r.id, r.title, r.salary, d.name as department
     from role r 
     JOIN department d
     ON r.department_id = d.id
-    ORDER BY r.id`, (err, result) => {
-        if (err) {
-          console.log(err);
-        }
-        console.table(result);
-      });
+    ORDER BY r.id`);
+    console.table(rows[0]);
       rePrompt(db)
 }
-viewAllEmployees = () => {
-    const db = getConnection() 
-    db.query(`
+viewAllEmployees = async () => {
+    const db = await getConnection();
+    const rows = await db.query(`
     SELECT e.id, e.first_name, e.last_name, r.title, r.salary, d.name as department, CONCAT (m.first_name, ' ', m.last_name) as manager
     from employee e
     LEFT JOIN employee m
@@ -158,21 +163,48 @@ viewAllEmployees = () => {
     JOIN department d
     ON r.department_id = d.id
     ORDER BY e.id
-    `, (err, result) => {
-        if (err) {
-          console.log(err);
-        }
-        console.table(result);
-      });
+    `);
+    console.table(rows[0]);
       rePrompt(db)
 }
-addDepartment = () => {
-    const db = getConnection()
-
+addDepartment = async () => {
+    const db = await getConnection()
+    const input = await inquirer.prompt([
+        {
+          name: "department",
+          message: "Enter New Department Name:",
+        },
+      ]);
+    await db.query('INSERT INTO department (name) values(?)', input.department)
+    console.log(`Successfully added department ${input.department}`)
     rePrompt(db)
 }
-addRole = () => {
-    const db = getConnection() 
+addRole = async () => {
+    const db = await getConnection() 
+    const departments = await db.query(departmentQuery);
+    const input = await inquirer.prompt([
+        {
+          name: "title",
+          message: "Enter new role title:",
+        },
+        {
+          type: "input",
+          name: "salary",
+          message: "Enter new role salary:",
+          validate: input => {
+            const numericValue = parseFloat(input);
+            return !isNaN(numericValue) && isFinite(numericValue) ? true : 'Please enter a valid numeric value'
+          }
+        },
+        {
+            type: "list",
+            name: "department",
+            message: "Select Department",
+            choices: departments[0].map(department => department.name)
+        },
+      ]);
+      await db.query('INSERT INTO role (title, salary, department_id) values(?, ?, ?)', [input.title, input.salary, departments[0].find(department => department.name === input.department).id])
+      console.log(`Successfully added role ${input.title} with ${input.salary} in department ${input.department}`)
     rePrompt(db)
 }
 addEmployee = () => {
