@@ -3,17 +3,6 @@ const mysql = require('mysql2/promise')
 require('dotenv').config();
 
 
-
-    // const db = mysql.createConnection(
-    //     {
-    //       host: 'localhost',
-    //       port: 3306,
-    //       user: process.env.DB_USER,
-    //       password: process.env.DB_PASSWORD,
-    //       database:  process.env.DB_NAME,
-    //     },
-    // );
-
 function getConnection() {
     return mysql.createConnection(
         {
@@ -24,18 +13,6 @@ function getConnection() {
         database:  process.env.DB_NAME,
         }
     );
-    // return new Promise(async (resolve, reject) => {
-    //     const connection = await mysql.createConnection(
-    //         {
-    //         host: 'localhost',
-    //         port: 3306,
-    //         user: process.env.DB_USER,
-    //         password: process.env.DB_PASSWORD,
-    //         database:  process.env.DB_NAME,
-    //         }
-    //     );
-    //     resolve(connection);
-    // })
 }
 
 function closeConnection(db){
@@ -133,6 +110,8 @@ const promptUser = () => {
 };
 
 const departmentQuery = `SELECT * from department`
+const roleQuery = `SELECT * FROM role`
+const employeeQuery = `SELECT * FROM employee`
 
 viewAllDepartments = async () => {
     const db = await getConnection();
@@ -207,12 +186,57 @@ addRole = async () => {
       console.log(`Successfully added role ${input.title} with ${input.salary} in department ${input.department}`)
     rePrompt(db)
 }
-addEmployee = () => {
-    const db = getConnection() 
+addEmployee = async () => {
+    const db = await getConnection() 
+    const roles = await db.query(roleQuery);
+    const managers = await db.query(employeeQuery);
+    const input = await inquirer.prompt([
+    {
+        name: "first_name",
+        message: "Enter employee's first name:",
+      },
+      {
+        name: "last_name",
+        message: "Enter employee's last name:",
+      },
+      {
+        type: "list",
+        name: "role",
+        message: "Enter employee's role:",
+        choices: roles[0].map(role => role.title)
+      },
+      {
+        type: "list",
+        name: "manager",
+        message: "Enter employee's manager:",
+        choices: managers[0].map(employee => `${employee.first_name} ${employee.last_name}`)
+      },
+    ]);
+    await db.query('INSERT INTO employee (first_name, last_name, role_id, manager_id) values(?, ?, ?, ?)', [input.first_name, input.last_name, roles[0].find(role => role.title === input.role).id, managers[0].find(employee => `${employee.first_name} ${employee.last_name}` === input.manager).id])
+      console.log(`Successfully added new employee ${input.first_name} ${input.last_name} as a ${input.role} working for ${input.manager}`)
     rePrompt(db)
 }
-updateEmployeeRole = () => {
-    const db = getConnection() 
+updateEmployeeRole = async () => {
+    const db = await getConnection() 
+    const roles = await db.query(roleQuery);
+    const employees = await db.query(employeeQuery);
+    const input = await inquirer.prompt([
+        {
+            type: "list",
+            name: "employee",
+            message: "Choose employee",
+            choices: employees[0].map(employee => `${employee.first_name} ${employee.last_name}`),
+          },
+          {
+            type: "list",
+            name: "role",
+            message: "Enter employee's role:",
+            choices: roles[0].map(role => role.title)
+         
+          },
+        ]);
+        await db.query('UPDATE employee set role_id = ? where id = ?', [roles[0].find(role => role.title === input.role).id, employees[0].find(employee => `${employee.first_name} ${employee.last_name}` === input.employee).id] )
+        console.log(`Successfully updated employee ${input.employee} as a ${input.role}`)
     rePrompt(db)
 }
 updateEmployeeManager = () => {
