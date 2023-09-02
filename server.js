@@ -43,7 +43,7 @@ const promptUser = () => {
                 'Add a role',
                 'Add an employee',
                 'Update an employee role',
-                'Update employee managers',
+                'Update employee manager',
                 "View employees by manager",
                 "View employees by department",
                 'Delete a department',
@@ -83,8 +83,12 @@ const promptUser = () => {
                 updateEmployeeRole();
             }
 
-            if (choices === "Update an employee manager") {
+            if (choices === "Update employee manager") {
                 updateEmployeeManager();
+            }
+
+            if (choices === "View employees by manager") {
+                viewEmployeesByManager();
             }
 
             if (choices === "View employees by department") {
@@ -239,7 +243,33 @@ updateEmployeeRole = async () => {
         console.log(`Successfully updated employee ${input.employee} as a ${input.role}`)
     rePrompt(db)
 }
-updateEmployeeManager = () => {
+updateEmployeeManager = async () => {
+    const db = await getConnection() 
+    const employees = await db.query(employeeQuery);
+    const input = await inquirer.prompt([
+      {
+        type: "list",
+        name: "employee",
+        message: "Choose employee",
+        choices: employees[0].map(employee => `${employee.first_name} ${employee.last_name}`)
+      },
+
+      {
+        type: "list",
+        name: "manager",
+        message: "Enter employee's manager:",
+        choices: employees[0].map(employee => `${employee.first_name} ${employee.last_name}`)
+      },
+    ]);
+    if(input.employee === input.manager) {
+        console.log("Employee cant be their own manager, please choose valid options.")
+        return updateEmployeeManager()
+    }
+    await db.query('UPDATE employee set manager_id = ? where id = ?', [employees[0].find(employee => `${employee.first_name} ${employee.last_name}` === input.manager).id, employees[0].find(employee => `${employee.first_name} ${employee.last_name}` === input.employee).id])
+    console.log(`Successfully updated employee ${input.employee} to work for ${input.manager}`)
+    rePrompt(db)
+}
+viewEmployeesByManager = () => {
     const db = getConnection() 
     rePrompt(db)
 }
