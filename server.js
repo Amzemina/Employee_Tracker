@@ -116,6 +116,13 @@ const promptUser = () => {
 const departmentQuery = `SELECT * from department`
 const roleQuery = `SELECT * FROM role`
 const employeeQuery = `SELECT * FROM employee`
+const managerQuery = `SELECT * 
+FROM employee m
+WHERE exists (
+  SELECT id
+  FROM employee e
+  WHERE m.id = e.manager_id
+)`
 
 viewAllDepartments = async () => {
     const db = await getConnection();
@@ -269,12 +276,52 @@ updateEmployeeManager = async () => {
     console.log(`Successfully updated employee ${input.employee} to work for ${input.manager}`)
     rePrompt(db)
 }
-viewEmployeesByManager = () => {
-    const db = getConnection() 
+viewEmployeesByManager = async () => {
+    const db = await getConnection() 
+    const managers = await db.query(managerQuery)
+    const input = await inquirer.prompt([
+        {
+          type: "list",
+          name: "manager",
+          message: "Choose manager",
+          choices: managers[0].map(manager => `${manager.first_name} ${manager.last_name}`)
+        },
+    ]);
+    const results = await db.query(`SELECT e.id, e.first_name, e.last_name, r.title, r.salary, d.name as department, CONCAT (m.first_name, ' ', m.last_name) as manager
+    from employee e
+    LEFT JOIN employee m
+    ON e.manager_id = m.id
+    JOIN role r 
+    ON e.role_id = r.id
+    JOIN department d
+    ON r.department_id = d.id
+    WHERE e.manager_id = ?
+    ORDER BY e.id `, [managers[0].find(manager => `${manager.first_name} ${manager.last_name}` === input.manager).id])
+    console.table(results[0])
     rePrompt(db)
 }
-viewEmployeesByDepartment = () => {
-    const db = getConnection() 
+viewEmployeesByDepartment = async () => {
+    const db = await getConnection()
+    const departments = await db.query(departmentQuery)
+    const input = await inquirer.prompt([
+        {
+          type: "list",
+          name: "department",
+          message: "Choose department",
+          choices: departments[0].map(department => `${department.name}`)
+        },
+    ]);
+    const results = await db.query(`SELECT e.id, e.first_name, e.last_name, r.title, r.salary, d.name as department, CONCAT (m.first_name, ' ', m.last_name) as manager
+    from employee e
+    LEFT JOIN employee m
+    ON e.manager_id = m.id
+    JOIN role r 
+    ON e.role_id = r.id
+    JOIN department d
+    ON r.department_id = d.id
+    WHERE d.id = ?
+    ORDER BY e.id `, [departments[0].find(department => `${department.name}` === input.department).id])
+    console.table(results[0])
     rePrompt(db)
 }
 deleteDepartment = () => {
