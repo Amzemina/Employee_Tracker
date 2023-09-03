@@ -135,7 +135,7 @@ viewAllRoles = async () => {
     const rows = await db.query(`
     SELECT r.id, r.title, r.salary, d.name as department
     from role r 
-    JOIN department d
+    LEFT JOIN department d
     ON r.department_id = d.id
     ORDER BY r.id`);
     console.table(rows[0]);
@@ -148,9 +148,9 @@ viewAllEmployees = async () => {
     from employee e
     LEFT JOIN employee m
     ON e.manager_id = m.id
-    JOIN role r 
+    LEFT JOIN role r 
     ON e.role_id = r.id
-    JOIN department d
+    LEFT JOIN department d
     ON r.department_id = d.id
     ORDER BY e.id
     `);
@@ -291,9 +291,9 @@ viewEmployeesByManager = async () => {
     from employee e
     LEFT JOIN employee m
     ON e.manager_id = m.id
-    JOIN role r 
+    LEFT JOIN role r 
     ON e.role_id = r.id
-    JOIN department d
+    LEFT JOIN department d
     ON r.department_id = d.id
     WHERE e.manager_id = ?
     ORDER BY e.id `, [managers[0].find(manager => `${manager.first_name} ${manager.last_name}` === input.manager).id])
@@ -315,29 +315,83 @@ viewEmployeesByDepartment = async () => {
     from employee e
     LEFT JOIN employee m
     ON e.manager_id = m.id
-    JOIN role r 
+    LEFT JOIN role r 
     ON e.role_id = r.id
-    JOIN department d
+    LEFT JOIN department d
     ON r.department_id = d.id
     WHERE d.id = ?
     ORDER BY e.id `, [departments[0].find(department => `${department.name}` === input.department).id])
     console.table(results[0])
     rePrompt(db)
 }
-deleteDepartment = () => {
-    const db = getConnection() 
+deleteDepartment = async () => {
+    const db = await getConnection()
+    const departments = await db.query(departmentQuery)
+    const input = await inquirer.prompt([
+        {
+          type: "list",
+          name: "department",
+          message: "Choose department to delete",
+          choices: departments[0].map(department => `${department.name}`)
+        },
+    ]);
+    await db.query(`DELETE from department WHERE name = ?`, [input.department])
+    console.log(`Successfully deleted ${input.department}`)
     rePrompt(db)
 }
-deleteRole = () => {
-    const db = getConnection() 
+deleteRole = async () => {
+    const db = await getConnection()
+    const roles = await db.query(roleQuery)
+    const input = await inquirer.prompt([
+      {
+        type: "list",
+        name: "role",
+        message: "Choose a role to delete",
+        choices: roles[0].map(role => `${role.title}`)
+      },
+  ]);
+  await db.query(`DELETE from role WHERE title = ?`, [input.role])
+  console.log(`Successfully deleted ${input.role}`)
     rePrompt(db)
 }
-deleteEmployee = () => {
-    const db = getConnection() 
+deleteEmployee = async () => {
+    const db = await getConnection() 
+    const employees = await db.query(employeeQuery);
+    const input = await inquirer.prompt([
+      {
+        type: "list",
+        name: "employee",
+        message: "Choose employee to delete",
+        choices: employees[0].map(employee => `${employee.first_name} ${employee.last_name}`)
+      },
+  ]);
+  await db.query(`DELETE from employee WHERE id = ?`, [employees[0].find(employee => `${employee.first_name} ${employee.last_name}`).id])
+  console.log(`Successfully deleted ${input.employee}`)
     rePrompt(db)
 }
-viewBudgets = () => {
-    const db = getConnection() 
+viewBudgets = async () => {
+    const db = await getConnection()
+    const departments = await db.query(departmentQuery)
+    const input = await inquirer.prompt([
+        {
+          type: "list",
+          name: "department",
+          message: "Choose department to view budget",
+          choices: departments[0].map(department => `${department.name}`)
+        },
+    ]);
+    const rows = await db.query(`
+    SELECT SUM(r.salary) as budget, d.name as department
+    from employee e
+    LEFT JOIN role r 
+    ON e.role_id = r.id
+    LEFT JOIN department d
+    ON r.department_id = d.id
+    WHERE d.name = ?
+    GROUP BY d.id
+    ORDER BY d.id
+    `, [input.department]);
+    console.table(rows[0])
     rePrompt(db)
 }
 promptUser();
