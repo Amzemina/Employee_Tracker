@@ -1,8 +1,9 @@
+// Imports
 const inquirer = require('inquirer');
 const mysql = require('mysql2/promise')
 require('dotenv').config();
 
-
+// MSQL connection with credentials 
 function getConnection() {
     return mysql.createConnection(
         {
@@ -14,7 +15,7 @@ function getConnection() {
         }
     );
 }
-
+// End connection
 function closeConnection(db){
     db.end((err) => {
         if (err) {
@@ -24,12 +25,12 @@ function closeConnection(db){
           }
     })
 }
-
+// Re-prompts user after choosing option
 function rePrompt(db) {
     closeConnection(db)
     promptUser()
 }
-
+// Application prompts
 const promptUser = () => {
     inquirer.prompt([
         {
@@ -112,7 +113,7 @@ const promptUser = () => {
             }
         });
 };
-
+// Variables used multiple times
 const departmentQuery = `SELECT * from department`
 const roleQuery = `SELECT * FROM role`
 const employeeQuery = `SELECT * FROM employee`
@@ -123,7 +124,7 @@ WHERE exists (
   FROM employee e
   WHERE m.id = e.manager_id
 )`
-
+// Prompt functions
 viewAllDepartments = async () => {
     const db = await getConnection();
     const departments = await db.query(departmentQuery);
@@ -250,6 +251,7 @@ updateEmployeeRole = async () => {
         console.log(`Successfully updated employee ${input.employee} as a ${input.role}`)
     rePrompt(db)
 }
+// Bonus 
 updateEmployeeManager = async () => {
     const db = await getConnection() 
     const employees = await db.query(employeeQuery);
